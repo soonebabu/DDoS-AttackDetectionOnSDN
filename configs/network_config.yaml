@@ -1,0 +1,19 @@
+network:
+  controller:
+    ip: "127.0.0.1"
+    port: 6633
+    protocol: "OpenFlow13"
+  
+  topology:
+    switches: 3
+    hosts_per_switch: 6
+    total_hosts: 18
+  
+  hosts:
+    victim: "h10"
+    attackers: ["h15", "h16", "h17", "h18"]
+
+ddos_detection:
+  model: "lstm_gru"
+  threshold: 0.7
+  flow_timeout: 60

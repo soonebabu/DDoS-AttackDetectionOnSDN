@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDN DDoS Detection Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        
+        body {
+            background: #f0f0f0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .status-bar {
+            background: #34495e;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #7f8c8d;
+        }
+        
+        .status-dot.connected { background: #2ecc71; }
+        .status-dot.running { background: #3498db; }
+        .status-dot.loaded { background: #2ecc71; }
+        
+        .dashboard {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .attack-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .attack-item {
+            background: white;
+            border-left: 4px solid #e74c3c;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .attack-time {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .attack-info {
+            margin-top: 5px;
+        }
+        
+        .attack-source {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .attack-target {
+            color: #3498db;
+            font-weight: bold;
+        }
+        
+        .attack-prob {
+            background: #e74c3c;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .model-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .model-loaded {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        
+        .model-not-loaded {
+            color: #e74c3c;
+        }
+        
+        .last-update {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> SDN DDoS Detection Dashboard</h1>
+            <p>Real-time monitoring of DDoS attacks in Software-Defined Networks</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="controller-status"></span>
+                <span>Controller: <span id="controller-text">Checking...</span></span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="mininet-status"></span>
+                <span>Mininet: <span id="mininet-text">Checking...</span></span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="models-status"></span>
+                <span>Models: <span id="models-text">Checking...</span></span>
+            </div>
+            <div class="status-item">
+                Last Update: <span id="update-time">--:--:--</span>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <!-- Statistics Card -->
+            <div class="card">
+                <h3>📊 Network Statistics</h3>
+                <div id="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Packets:</span>
+                        <span class="stat-value" id="total-packets">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Normal Packets:</span>
+                        <span class="stat-value" id="normal-packets">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Attack Packets:</span>
+                        <span class="stat-value" id="attack-packets">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Blocked Flows:</span>
+                        <span class="stat-value" id="blocked-flows">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Active Flows:</span>
+                        <span class="stat-value" id="active-flows">0</span>
+                    </div>
+                </div>
+                <div class="last-update" id="stats-update">--</div>
+            </div>
+            
+            <!-- Recent Attacks Card -->
+            <div class="card">
+                <h3>⚠️ Recent Attacks</h3>
+                <div class="attack-list" id="attack-list">
+                    <div class="attack-item">
+                        <div class="attack-time">No attacks detected yet</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model Status Card -->
+            <div class="card">
+                <h3>ML Models</h3>
+                <div class="model-grid" id="model-grid">
+                    <div class="model-item">
+                        <div>LSTM Model</div>
+                        <div class="model-loading">Loading...</div>
+                    </div>
+                    <div class="model-item">
+                        <div>GRU Model</div>
+                        <div class="model-loading">Loading...</div>
+                    </div>
+                    <div class="model-item">
+                        <div>BiLSTM Model</div>
+                        <div class="model-loading">Loading...</div>
+                    </div>
+                    <div class="model-item">
+                        <div>LSTM-GRU Model</div>
+                        <div class="model-loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update dashboard every 2 seconds
+        function updateDashboard() {
+            // Update stats
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(stats => {
+                    document.getElementById('total-packets').textContent = formatNumber(stats.total_packets);
+                    document.getElementById('normal-packets').textContent = formatNumber(stats.normal_packets);
+                    document.getElementById('attack-packets').textContent = formatNumber(stats.attack_packets);
+                    document.getElementById('blocked-flows').textContent = formatNumber(stats.blocked_flows);
+                    document.getElementById('active-flows').textContent = formatNumber(stats.active_flows);
+                    
+                    document.getElementById('stats-update').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+                    document.getElementById('update-time').textContent = new Date().toLocaleTimeString();
+                });
+            
+            // Update attacks
+            fetch('/api/attacks')
+                .then(response => response.json())
+                .then(attacks => {
+                    const attackList = document.getElementById('attack-list');
+                    
+                    if (attacks.length === 0) {
+                        attackList.innerHTML = '<div class="attack-item"><div class="attack-time">No attacks detected yet</div></div>';
+                        return;
+                    }
+                    
+                    attackList.innerHTML = '';
+                    
+                    attacks.forEach(attack => {
+                        const time = new Date(attack.timestamp);
+                        const probability = (attack.probability * 100).toFixed(1);
+                        
+                        const attackItem = document.createElement('div');
+                        attackItem.className = 'attack-item';
+                        attackItem.innerHTML = `
+                            <div class="attack-time">${time.toLocaleTimeString()}</div>
+                            <div class="attack-info">
+                                <span class="attack-source">${attack.source_ip}:${attack.source_port}</span>
+                                → 
+                                <span class="attack-target">${attack.destination_ip}:${attack.destination_port}</span>
+                                <span class="attack-prob">${probability}%</span>
+                            </div>
+                            <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 5px;">
+                                ${attack.protocol} • ${attack.packet_count} packets • Model: ${attack.model || 'LSTM-GRU'}
+                            </div>
+                        `;
+                        
+                        attackList.appendChild(attackItem);
+                    });
+                    
+                    attackList.scrollTop = attackList.scrollHeight;
+                });
+            
+            // Update system status
+            updateSystemStatus();
+        }
+        
+        function updateSystemStatus() {
+            // Check controller
+            fetch('/api/stats')
+                .then(response => {
+                    const controllerDot = document.getElementById('controller-status');
+                    const controllerText = document.getElementById('controller-text');
+                    
+                    if (response.ok) {
+                        controllerDot.className = 'status-dot connected';
+                        controllerText.textContent = 'Connected';
+                    } else {
+                        controllerDot.className = 'status-dot';
+                        controllerText.textContent = 'Disconnected';
+                    }
+                });
+            
+            // Check models
+            fetch('/api/models')
+                .then(response => response.json())
+                .then(models => {
+                    const modelsDot = document.getElementById('models-status');
+                    const modelsText = document.getElementById('models-text');
+                    const modelGrid = document.getElementById('model-grid');
+                    
+                    const allLoaded = Object.values(models).every(loaded => loaded);
+                    
+                    if (allLoaded) {
+                        modelsDot.className = 'status-dot loaded';
+                        modelsText.textContent = 'Loaded';
+                    } else {
+                        modelsDot.className = 'status-dot';
+                        modelsText.textContent = 'Partial';
+                    }
+                    
+                    // Update model grid
+                    modelGrid.innerHTML = '';
+                    
+                    for (const [modelName, isLoaded] of Object.entries(models)) {
+                        const modelItem = document.createElement('div');
+                        modelItem.className = 'model-item';
+                        modelItem.innerHTML = `
+                            <div>${modelName}</div>
+                            <div class="${isLoaded ? 'model-loaded' : 'model-not-loaded'}">
+                                ${isLoaded ? '✓ Loaded' : '✗ Not Loaded'}
+                            </div>
+                        `;
+                        modelGrid.appendChild(modelItem);
+                    }
+                });
+        }
+        
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+        
+        // Initial load
+        updateDashboard();
+        updateSystemStatus();
+        
+        // Update every 2 seconds
+        setInterval(updateDashboard, 2000);
+        
+        // Update system status every 10 seconds
+        setInterval(updateSystemStatus, 10000);
+    </script>
+</body>
+</html>
