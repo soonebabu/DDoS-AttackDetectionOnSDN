@@ -30,6 +30,10 @@ The system collects network flow statistics from the SDN controller, preprocesse
 - Flask (Web Dashboard)
 - Ubuntu / Linux (recommended)
 
+## Research from the paper
+Distributed Denial of Service Attack Detection on Software Defined Networking Using Deep Learning
+http://conference.ioe.edu.np/ioegc10/papers/ioegc-10-093-10127.pdf
+
 ---
 
 ## 📂 Project Structure
